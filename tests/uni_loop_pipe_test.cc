@@ -2,6 +2,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <thread>
 
 #include "uni_loop/uni_loop.h"
 
@@ -53,4 +54,27 @@ TEST(UniLoopPipeTest, PipeWriteEvent) {
 
   close(file_descs[0]);
   close(file_descs[1]);
+}
+
+TEST(UniLoopPipeTest, PipeCloseEvent) {
+  int file_descs[2];
+  ASSERT_EQ(pipe(file_descs), 0);
+
+  UniLoop::UniLoop loop;
+  bool called = false;
+
+  loop.addFd(file_descs[0], UniLoop::EventType::Close,
+             [&](int file_desc, UniLoop::EventType event_type) {
+               EXPECT_EQ(event_type, UniLoop::EventType::Close);
+               called = true;
+               loop.stop();
+             });
+
+  close(file_descs[1]);
+
+  loop.run();
+
+  close(file_descs[0]);
+
+  EXPECT_TRUE(called);
 }
