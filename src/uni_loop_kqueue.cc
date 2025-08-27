@@ -1,7 +1,6 @@
 #include <sys/event.h>
 #include <unistd.h>
 
-#include <iostream>
 #include <stdexcept>
 
 #include "uni_loop/uni_loop.h"
