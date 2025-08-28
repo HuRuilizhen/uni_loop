@@ -15,6 +15,8 @@ if(APPLE)
   set(UNI_LOOP_SRC src/uni_loop_kqueue.cc)
 elseif(UNIX)
   set(UNI_LOOP_SRC src/uni_loop_epoll.cc)
+else()
+  message(FATAL_ERROR "Unsupported platform")
 endif()
 
 add_library(uni_loop STATIC ${UNI_LOOP_SRC})
