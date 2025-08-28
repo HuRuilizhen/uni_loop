@@ -2,7 +2,6 @@
 #include <unistd.h>
 
 #include <string>
-#include <thread>
 
 #include "uni_loop/uni_loop.h"
 

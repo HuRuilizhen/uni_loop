@@ -10,7 +10,7 @@ using EventCallback = std::function<void(int file_desc, EventType)>;
 
 class UniLoop {
  public:
-  UniLoop();
+  UniLoop(int max_events = 64);
   ~UniLoop();
 
   void addFd(int file_desc, EventType event_type, EventCallback callback);
@@ -21,6 +21,7 @@ class UniLoop {
   void stop();
 
  private:
+  int max_events_;
   int backend_file_desc_;
   bool running_;
 
