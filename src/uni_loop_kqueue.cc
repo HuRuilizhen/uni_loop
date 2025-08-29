@@ -7,7 +7,8 @@
 
 namespace UniLoop {
 
-UniLoop::UniLoop(int max_events) : max_events_(max_events) {
+UniLoop::UniLoop(int max_events, timespec timeout)
+    : max_events_(max_events), timeout_(timeout) {
   backend_file_desc_ = kqueue();
   if (backend_file_desc_ == -1) {
     throw std::runtime_error("Failed to create kqueue");
@@ -55,7 +56,7 @@ void UniLoop::run() {
 
   while (running_) {
     int n = kevent(backend_file_desc_, nullptr, 0, events.data(), max_events_,
-                   nullptr);
+                   &timeout_);
     if (n < 0) {
       perror("kevent wait error");
       break;
