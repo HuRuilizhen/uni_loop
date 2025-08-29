@@ -7,7 +7,8 @@
 
 namespace UniLoop {
 
-UniLoop::UniLoop(int max_events) : max_events_(max_events) {
+UniLoop::UniLoop(int max_events, timespec timeout)
+    : max_events_(max_events), timeout_(timeout) {
   backend_file_desc_ = kqueue();
   if (backend_file_desc_ == -1) {
     throw std::runtime_error("Failed to create kqueue");
@@ -50,11 +51,12 @@ void UniLoop::delFd(int file_desc) {
 
 void UniLoop::run() {
   running_ = true;
+
   std::vector<struct kevent> events(max_events_);
 
   while (running_) {
     int n = kevent(backend_file_desc_, nullptr, 0, events.data(), max_events_,
-                   nullptr);
+                   &timeout_);
     if (n < 0) {
       perror("kevent wait error");
       break;
@@ -74,6 +76,17 @@ void UniLoop::run() {
       }
     }
   }
+}
+
+void UniLoop::asyncRun() {
+  if (running_.load()) return;
+  running_ = true;
+
+  worker_thread_ = std::thread([this] { UniLoop::run(); });
+}
+
+void UniLoop::wait() {
+  if (worker_thread_.joinable()) worker_thread_.join();
 }
 
 void UniLoop::stop() { running_ = false; }
