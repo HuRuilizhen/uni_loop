@@ -50,6 +50,7 @@ void UniLoop::delFd(int file_desc) {
 
 void UniLoop::run() {
   running_ = true;
+
   std::vector<struct kevent> events(max_events_);
 
   while (running_) {
@@ -74,6 +75,17 @@ void UniLoop::run() {
       }
     }
   }
+}
+
+void UniLoop::asyncRun() {
+  if (running_.load()) return;
+  running_ = true;
+
+  worker_thread_ = std::thread([this] { UniLoop::run(); });
+}
+
+void UniLoop::wait() {
+  if (worker_thread_.joinable()) worker_thread_.join();
 }
 
 void UniLoop::stop() { running_ = false; }

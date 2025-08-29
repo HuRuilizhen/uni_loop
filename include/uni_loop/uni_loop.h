@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <thread>
 #include <unordered_map>
 
 namespace UniLoop {
@@ -18,12 +19,15 @@ class UniLoop {
   void delFd(int file_desc);
 
   void run();
+  void asyncRun();
   void stop();
+  void wait();
 
  private:
   int max_events_;
   int backend_file_desc_;
-  bool running_;
+  std::atomic<bool> running_;
+  std::thread worker_thread_;
 
   std::unordered_map<int, EventCallback> callbacks_;
   std::unordered_map<int, EventType> interests_;
