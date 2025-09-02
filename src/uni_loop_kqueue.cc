@@ -18,35 +18,68 @@ UniLoop::UniLoop(int max_events, timespec timeout)
 
 UniLoop::~UniLoop() { close(backend_file_desc_); }
 
-void UniLoop::addFd(int file_desc, EventType event_type,
-                    EventCallback callback) {
+void UniLoop::addEvent(const Event& event, EventCallback callback) {
+  int event_ident = next_event_ident_++;
+
   struct kevent ke;
-  short filter = (event_type == EventType::Read) ? EVFILT_READ : EVFILT_WRITE;
-  EV_SET(&ke, file_desc, filter, EV_ADD | EV_ENABLE, 0, 0, NULL);
+  short filter;
+
+  switch (event.type) {
+    case EventType::Read:
+      filter = EVFILT_READ;
+      EV_SET(&ke, event.ident, filter, EV_ADD | EV_ENABLE, 0, 0,
+             (void*)(intptr_t)event_ident);
+      break;
+    case EventType::Timer:
+      filter = EVFILT_TIMER;
+      EV_SET(&ke, event.ident, filter, EV_ADD | EV_ENABLE, 0, event.interval_ms,
+             (void*)(intptr_t)event_ident);
+      break;
+    default:
+      filter = EVFILT_WRITE;
+      EV_SET(&ke, event.ident, filter, EV_ADD | EV_ENABLE, 0, 0,
+             (void*)(intptr_t)event_ident);
+  }
 
   if (kevent(backend_file_desc_, &ke, 1, nullptr, 0, nullptr) == -1) {
     throw std::runtime_error("kevent addFd failed");
   }
-  callbacks_[file_desc] = callback;
-  interests_[file_desc] = event_type;
+
+  event_ids_[event] = event_ident;
+  id_events_[event_ident] = event;
+  callbacks_[event_ident] = callback;
 }
 
-void UniLoop::modFd(int file_desc, EventType event_type) {
-  delFd(file_desc);
-  addFd(file_desc, event_type, callbacks_[file_desc]);
+void UniLoop::modEvent(const Event& event, EventCallback callback) {
+  delEvent(event);
+  addEvent(event, callback);
 }
 
-void UniLoop::delFd(int file_desc) {
-  auto it = interests_.find(file_desc);
-  if (it == interests_.end()) return;
+void UniLoop::delEvent(const Event& event) {
+  auto it = event_ids_.find(event);
+  if (it == event_ids_.end()) return;
 
   struct kevent ke;
-  short filter = (it->second == EventType::Read) ? EVFILT_READ : EVFILT_WRITE;
-  EV_SET(&ke, file_desc, filter, EV_DELETE, 0, 0, NULL);
+  short filter;
+  switch (event.type) {
+    case EventType::Read:
+      filter = EVFILT_READ;
+      break;
+    case EventType::Timer:
+      filter = EVFILT_TIMER;
+      break;
+    default:
+      filter = EVFILT_WRITE;
+  }
+
+  EV_SET(&ke, event.ident, filter, EV_DELETE, 0, 0,
+         (void*)(intptr_t)it->second);
 
   kevent(backend_file_desc_, &ke, 1, nullptr, 0, nullptr);
-  callbacks_.erase(file_desc);
-  interests_.erase(file_desc);
+
+  event_ids_.erase(it);
+  id_events_.erase(it->second);
+  callbacks_.erase(it->second);
 }
 
 void UniLoop::run() {
@@ -62,18 +95,12 @@ void UniLoop::run() {
       break;
     }
     for (int i = 0; i < n; i++) {
-      int file_desc = static_cast<int>(events[i].ident);
-      auto callback_it = callbacks_.find(file_desc);
-      if (callback_it == callbacks_.end()) continue;
-
-      EventType ev = interests_[file_desc];
-      if (events[i].flags & EV_EOF) {
-        callback_it->second(file_desc, EventType::Close);
-      } else if (events[i].flags & EV_ERROR) {
-        callback_it->second(file_desc, EventType::Error);
-      } else {
-        callback_it->second(file_desc, ev);
-      }
+      int event_ident = (intptr_t)events[i].udata;
+      auto callback_it = callbacks_.find(event_ident);
+      if (callbacks_.find(event_ident) == callbacks_.end()) continue;
+      auto id_events_it = id_events_.find(event_ident);
+      if (id_events_.find(event_ident) == id_events_.end()) continue;
+      callback_it->second(id_events_it->second);
     }
   }
 }
