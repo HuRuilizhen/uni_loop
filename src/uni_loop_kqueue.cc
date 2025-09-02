@@ -27,16 +27,19 @@ void UniLoop::addEvent(const Event& event, EventCallback callback) {
   switch (event.type) {
     case EventType::Read:
       filter = EVFILT_READ;
+      EV_SET(&ke, event.ident, filter, EV_ADD | EV_ENABLE, 0, 0,
+             (void*)(intptr_t)event_ident);
       break;
     case EventType::Timer:
       filter = EVFILT_TIMER;
+      EV_SET(&ke, event.ident, filter, EV_ADD | EV_ENABLE, 0, event.interval_ms,
+             (void*)(intptr_t)event_ident);
       break;
     default:
       filter = EVFILT_WRITE;
+      EV_SET(&ke, event.ident, filter, EV_ADD | EV_ENABLE, 0, 0,
+             (void*)(intptr_t)event_ident);
   }
-
-  EV_SET(&ke, event.ident, filter, EV_ADD | EV_ENABLE, 0, 0,
-         (void*)(intptr_t)event_ident);
 
   if (kevent(backend_file_desc_, &ke, 1, nullptr, 0, nullptr) == -1) {
     throw std::runtime_error("kevent addFd failed");
