@@ -11,20 +11,25 @@ TEST(UniLoopBasicTest, MultiFileDescTriggered) {
   UniLoop::UniLoop loop;
   int count = 0;
 
-  loop.addFd(file_desc_1[0], UniLoop::EventType::Read,
-             [&](int file_desc_1, UniLoop::EventType event_type) {
-               char buf[4];
-               read(file_desc_1, buf, sizeof(buf));
-               count++;
-               if (count == 2) loop.stop();
-             });
-  loop.addFd(file_desc_2[0], UniLoop::EventType::Read,
-             [&](int fd, UniLoop::EventType event_type) {
-               char buf[4];
-               read(fd, buf, sizeof(buf));
-               count++;
-               if (count == 2) loop.stop();
-             });
+  UniLoop::Event event_1;
+  event_1.ident = file_desc_1[0];
+  event_1.type = UniLoop::EventType::Read;
+  UniLoop::Event event_2;
+  event_2.ident = file_desc_2[0];
+  event_2.type = UniLoop::EventType::Read;
+
+  loop.addEvent(event_1, [&](UniLoop::Event event) {
+    char buf[4];
+    read(event_1.ident, buf, sizeof(buf));
+    count++;
+    if (count == 2) loop.stop();
+  });
+  loop.addEvent(event_2, [&](UniLoop::Event event) {
+    char buf[4];
+    read(event_2.ident, buf, sizeof(buf));
+    count++;
+    if (count == 2) loop.stop();
+  });
 
   write(file_desc_1[1], "a", 1);
   write(file_desc_2[1], "b", 1);
